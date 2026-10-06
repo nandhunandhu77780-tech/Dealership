@@ -1,0 +1,401 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Models & Schemas
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (Firebase Auth UID)
+    // Fields:
+    //   - name: string (required, 1-200 chars)
+    //   - email: string (required, 1-200 chars)
+    //   - role: string (required, 'admin' or 'member')
+    //   - photoURL: string (optional, max 1000 chars)
+    //   - createdAt: string (required)
+    //   - updatedAt: string (optional)
+    //
+    // Collection: members
+    // Document ID: auto-generated
+    // Fields:
+    //   - name: string (required, 1-200 chars)
+    //   - email: string (required, max 200 chars)
+    //   - phone: string (optional, max 50 chars)
+    //   - address: string (optional, max 500 chars)
+    //   - memberId: string (required, business ID e.g. MEM-1234)
+    //   - status: string (required, 'active' or 'inactive')
+    //   - createdAt: string (required)
+    //   - updatedAt: string (optional)
+    //
+    // Collection: products
+    // Document ID: auto-generated
+    // Fields:
+    //   - name: string (required, 1-200 chars)
+    //   - description: string (optional, max 2000 chars)
+    //   - category: string (required, max 100 chars)
+    //   - price: number (required, >= 0)
+    //   - stock: number (required, >= 0)
+    //   - imageURL: string (optional, max 1000 chars)
+    //   - status: string (required, 'active' or 'inactive')
+    //   - createdAt: string (required)
+    //   - updatedAt: string (optional)
+    //
+    // Collection: orders
+    // Document ID: auto-generated
+    // Fields:
+    //   - memberId: string (required, Auth UID of ordering member)
+    //   - memberName: string (required)
+    //   - memberEmail: string (optional)
+    //   - productId: string (required)
+    //   - productName: string (required)
+    //   - quantity: number (required, >= 1)
+    //   - unitPrice: number (required, >= 0)
+    //   - totalAmount: number (required, >= 0)
+    //   - address: string (required, 1-500 chars)
+    //   - note: string (optional, max 1000 chars)
+    //   - status: string (required, 'pending'|'approved'|'rejected'|'completed')
+    //   - createdAt: string (required)
+    //   - updatedAt: string (optional)
+    //
+    // Collection: installmentPlans
+    // Document ID: auto-generated
+    // Fields:
+    //   - orderId: string (required)
+    //   - memberId: string (required, Auth UID of member)
+    //   - memberName: string (required)
+    //   - productName: string (required)
+    //   - totalAmount: number (required, >= 0)
+    //   - downPayment: number (required, >= 0)
+    //   - remainingAmount: number (required, >= 0)
+    //   - numberOfInstallments: number (required, >= 1)
+    //   - installmentAmount: number (required, >= 0)
+    //   - frequency: string (required, 'Weekly' or 'Monthly')
+    //   - firstDueDate: string (required)
+    //   - status: string (required, 'active'|'completed'|'Active'|'Completed')
+    //   - schedule: list (required array of installment items)
+    //   - totalPaid: number (optional, >= 0)
+    //   - remainingBalance: number (optional, >= 0)
+    //   - createdAt: string (required)
+    //   - updatedAt: string (optional)
+    //
+    // Collection: payments
+    // Document ID: auto-generated
+    // Fields:
+    //   - installmentPlanId: string (required)
+    //   - orderId: string (required)
+    //   - memberId: string (required, Auth UID of member)
+    //   - memberName: string (required)
+    //   - productName: string (optional)
+    //   - installmentNumber: number (required, >= 1)
+    //   - amount: number (required, > 0)
+    //   - paymentDate: string (required)
+    //   - paymentMethod: string (required, 'Cash'|'UPI'|'Bank Transfer'|'Other')
+    //   - note: string (optional, max 1000 chars)
+    //   - recordedBy: string (required)
+    //   - createdAt: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Global Authentication & Authorization Helpers
+    // ===============================================================
+
+    // Verify user is authenticated with Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Determine if the caller is an administrator:
+    // 1. Checks custom claims on auth token
+    // 2. OR checks role in users/{uid} document
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.role != null && request.auth.token.role == 'admin') ||
+        (request.auth.token.admin == true) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    // Verify user owns the document by comparing with request.auth.uid
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ===============================================================
+    // Validation Helper Functions
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.email is string && data.email.size() > 0 && data.email.size() <= 200 &&
+             data.role is string && (data.role == 'admin' || data.role == 'member') &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1000)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 500)) &&
+             (!('memberId' in data) || (data.memberId is string && data.memberId.size() <= 50)) &&
+             (!('status' in data) || (data.status is string && (data.status == 'active' || data.status == 'inactive')));
+    }
+
+    function isValidMember(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.email is string && data.email.size() <= 200 &&
+             data.status is string && (data.status == 'active' || data.status == 'inactive') &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 500));
+    }
+
+    function isValidProduct(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.category is string && data.category.size() > 0 && data.category.size() <= 100 &&
+             data.price is number && data.price >= 0 &&
+             data.stock is number && data.stock >= 0 &&
+             data.status is string && (data.status == 'active' || data.status == 'inactive') &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+             (!('imageURL' in data) || (data.imageURL is string && data.imageURL.size() <= 1000));
+    }
+
+    function isValidOrder(data) {
+      return data.memberId is string && data.memberId.size() > 0 &&
+             data.productId is string && data.productId.size() > 0 &&
+             data.quantity is number && data.quantity >= 1 &&
+             data.unitPrice is number && data.unitPrice >= 0 &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.address is string && data.address.size() > 0 && data.address.size() <= 500 &&
+             data.status is string && (data.status in ['pending', 'approved', 'rejected', 'completed']) &&
+             (!('note' in data) || (data.note is string && data.note.size() <= 1000)) &&
+             (!('productImageURL' in data) || (data.productImageURL is string && data.productImageURL.size() <= 1000));
+    }
+
+    function isValidInstallmentPlan(data) {
+      return data.orderId is string && data.orderId.size() > 0 &&
+             data.memberId is string && data.memberId.size() > 0 &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.downPayment is number && data.downPayment >= 0 &&
+             data.remainingAmount is number && data.remainingAmount >= 0 &&
+             data.numberOfInstallments is number && data.numberOfInstallments >= 1 &&
+             data.frequency is string && (data.frequency in ['Weekly', 'Monthly']) &&
+             data.schedule is list &&
+             data.status is string;
+    }
+
+    function isValidPayment(data) {
+      return data.installmentPlanId is string && data.installmentPlanId.size() > 0 &&
+             data.orderId is string &&
+             data.memberId is string && data.memberId.size() > 0 &&
+             data.installmentNumber is number && data.installmentNumber >= 1 &&
+             data.amount is number && data.amount > 0 &&
+             data.paymentDate is string && data.paymentDate.size() > 0 &&
+             data.paymentMethod is string && (data.paymentMethod in ['Cash', 'UPI', 'Bank Transfer', 'Other']);
+    }
+
+    function isValidNotification(data) {
+      return data.memberId is string && data.memberId.size() > 0 &&
+             data.title is string && data.title.size() > 0 &&
+             data.message is string && data.message.size() > 0 &&
+             data.type is string && (data.type in ['upcoming', 'due_today', 'overdue', 'payment_success', 'delivery_date_updated', 'delivery', 'delivery_status_updated']) &&
+             data.read is bool;
+    }
+
+    function isValidActivityLog(data) {
+      return data.action is string && data.action.size() > 0 && data.action.size() <= 200 &&
+             data.actionType is string && data.actionType.size() > 0 && data.actionType.size() <= 100 &&
+             data.adminName is string && data.adminName.size() > 0 && data.adminName.size() <= 200 &&
+             data.createdAt is string && data.createdAt.size() > 0;
+    }
+
+    function isValidFCMToken(data) {
+      return data.token is string && data.token.size() > 10 &&
+             data.memberId is string && data.memberId.size() > 0;
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // 1. Users Collection
+    // - User can read their own document; Admins can read all user documents
+    // - User can create their initial profile as 'member' (e.g. Google Sign-In)
+    // - Users CANNOT change their own role, memberId, or status on update; only Admins can
+    // - Only Admins can delete user profiles
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow create: if isAuthenticated() && (
+        (isOwner(userId) && request.resource.data.role == 'member') ||
+        isAdmin()
+      ) && isValidUser(request.resource.data);
+
+      allow update: if isAuthenticated() && (
+        (isOwner(userId) &&
+         request.resource.data.role == resource.data.role &&
+         (!('memberId' in resource.data) || request.resource.data.memberId == resource.data.memberId) &&
+         (!('status' in resource.data) || request.resource.data.status == resource.data.status)
+        ) ||
+        isAdmin()
+      ) && isValidUser(request.resource.data);
+
+      allow delete: if isAdmin();
+    }
+
+    // 2. Members Collection
+    // - Admins can create, read, update, and delete members
+    // - Members can read only their own member profile (matched by email, userId, or doc ID)
+    // - Members can update ONLY their own contact details (name, phone, address) and CANNOT change memberId or status
+    // - Only Admins can delete member records
+    match /members/{memberId} {
+      allow read: if isAdmin() || (
+        isAuthenticated() && (
+          (resource.data.email != null && resource.data.email == request.auth.token.email) ||
+          (resource.data.userId != null && resource.data.userId == request.auth.uid) ||
+          memberId == request.auth.uid
+        )
+      );
+
+      allow create: if isAdmin() && isValidMember(request.resource.data);
+
+      allow update: if (isAdmin() && isValidMember(request.resource.data)) || (
+        isAuthenticated() && (
+          (resource.data.email != null && resource.data.email == request.auth.token.email) ||
+          (resource.data.userId != null && resource.data.userId == request.auth.uid) ||
+          memberId == request.auth.uid
+        ) &&
+        request.resource.data.memberId == resource.data.memberId &&
+        request.resource.data.status == resource.data.status &&
+        isValidMember(request.resource.data)
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // 3. Products Collection
+    // - Authenticated users can read active products (for member catalog)
+    // - Admins can read all products (including inactive items)
+    // - Admins can create, update, and delete products
+    // - Members cannot create, update, or delete products
+    match /products/{productId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.status == 'active');
+
+      allow create, update: if isAdmin() && isValidProduct(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // 4. Orders Collection
+    // - Members can create orders ONLY for themselves (memberId == request.auth.uid) with status 'pending'
+    // - Members can read only their own orders
+    // - Members cannot modify or delete another member's orders
+    // - Admins can read and manage all orders (approve, reject, update stock)
+    // - Only Admins can change order status
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (
+        isAuthenticated() && resource.data.memberId == request.auth.uid
+      );
+
+      allow create: if isAuthenticated() && (
+        (request.resource.data.memberId == request.auth.uid && request.resource.data.status == 'pending') ||
+        isAdmin()
+      ) && isValidOrder(request.resource.data);
+
+      // Only admins can update status or manage orders
+      allow update: if isAdmin() && isValidOrder(request.resource.data);
+
+      allow delete: if isAdmin();
+    }
+
+    // 5. Installment Plans Collection
+    // - Members can read ONLY their own installment plans
+    // - Members cannot create, update, or delete installment plans
+    // - Admins can create, read, and update installment plans
+    match /installmentPlans/{planId} {
+      allow read: if isAdmin() || (
+        isAuthenticated() && resource.data.memberId == request.auth.uid
+      );
+
+      allow create, update: if isAdmin() && isValidInstallmentPlan(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // 6. Payments Collection
+    // - Members can read ONLY their own payment receipts
+    // - Members cannot create, update, or delete payment records
+    // - Only Admins can create, update, or manage manual payment receipts
+    match /payments/{paymentId} {
+      allow read: if isAdmin() || (
+        isAuthenticated() && resource.data.memberId == request.auth.uid
+      );
+
+      allow create, update: if isAdmin() && isValidPayment(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // 7. Notifications Collection
+    // - Members can read ONLY their own notifications
+    // - Members can create notifications for themselves (e.g. synced installment/payment events)
+    // - Members can update ONLY their own notifications (e.g., mark as read)
+    // - Admins can read notification status for members, but CANNOT modify another member's notification data
+    match /notifications/{notificationId} {
+      allow read: if isAdmin() || (
+        isAuthenticated() && resource.data.memberId == request.auth.uid
+      );
+
+      allow create: if isAuthenticated() && (
+        (request.resource.data.memberId == request.auth.uid) || isAdmin()
+      ) && isValidNotification(request.resource.data);
+
+      allow update: if isAuthenticated() && (
+        resource.data.memberId == request.auth.uid &&
+        request.resource.data.memberId == resource.data.memberId
+      ) && isValidNotification(request.resource.data);
+
+      allow delete: if isAdmin() || (
+        isAuthenticated() && resource.data.memberId == request.auth.uid
+      );
+    }
+
+    // 8. Activity Logs Collection
+    // - Only Admins can read activity logs
+    // - Only Admins can create activity logs with valid schema
+    // - Updates and deletions are STRICTLY prohibited (immutable audit log)
+    match /activityLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidActivityLog(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // 9. FCM Tokens Collection (Requirement 16)
+    // - Members can read, create, update, and delete ONLY their own device tokens (memberId == request.auth.uid)
+    // - Admins can read tokens for push dispatching & troubleshooting
+    // - Members CANNOT read or manipulate device tokens belonging to another member
+    match /fcmTokens/{tokenId} {
+      allow read: if isAdmin() || (
+        isAuthenticated() && resource.data.memberId == request.auth.uid
+      );
+
+      allow create: if isAuthenticated() && (
+        request.resource.data.memberId == request.auth.uid
+      ) && isValidFCMToken(request.resource.data);
+
+      allow update: if isAuthenticated() && (
+        resource.data.memberId == request.auth.uid &&
+        request.resource.data.memberId == request.auth.uid
+      ) && isValidFCMToken(request.resource.data);
+
+      allow delete: if isAdmin() || (
+        isAuthenticated() && resource.data.memberId == request.auth.uid
+      );
+    }
+
+    // 10. Overdue Push Logs (Server & Admin Audit Logs)
+    match /overduePushLogs/{logId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Default Deny: All other documents or subcollections are closed
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

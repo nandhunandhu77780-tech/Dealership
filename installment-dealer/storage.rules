@@ -1,0 +1,53 @@
+rules_version = '2';
+
+// ===============================================================
+// Nandhana Agencies - Firebase Storage Security Rules
+// ===============================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper: Determine if user is authenticated with Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Determine if user has administrator privileges
+    // 1. Checks custom claims on auth token
+    // 2. OR checks Firestore users collection role == 'admin'
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.role != null && request.auth.token.role == 'admin') ||
+        (request.auth.token.admin == true) ||
+        (firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    // Validation helper for product images:
+    // 1. Must be an image MIME type (image/jpeg, image/png, image/webp, etc.)
+    // 2. Maximum file size: 5MB (5 * 1024 * 1024 bytes)
+    function isValidProductImage() {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // Product Images Storage Rules
+    // Path: /products/{imageId}
+    match /products/{imageId} {
+      // Authenticated users can view product images (Catalog, Order views, Member & Admin views)
+      allow read: if isAuthenticated();
+
+      // Only authenticated administrators can upload, replace, and modify product images
+      allow create, update: if isAdmin() && isValidProductImage();
+
+      // Only authenticated administrators can delete product images
+      allow delete: if isAdmin();
+    }
+
+    // Default Deny: All other paths are strictly closed
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

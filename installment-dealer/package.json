@@ -1,0 +1,29 @@
+{
+  "name": "installment-dealer",
+  "version": "1.0.0",
+  "description": "Installment Dealer Management System - Full-stack web application",
+  "private": true,
+  "scripts": {
+    "dev": "npm run client",
+    "install-all": "npm install --prefix server && npm install --prefix client",
+    "client": "npm run dev --prefix client",
+    "server": "npm run dev --prefix server",
+    "create-user": "npm run create-user --prefix server",
+    "test:payment": "node server/scripts/testOnlinePayment.js",
+    "test:notifications": "node server/scripts/testNotifications.js",
+    "test:profile": "node server/scripts/testMemberProfile.js",
+    "test:collection": "node server/scripts/testDailyCollection.js",
+    "build": "npm run build --prefix client",
+    "deploy:rules": "firebase deploy --only firestore:rules,storage:rules",
+    "deploy:hosting": "npm run build && firebase deploy --only hosting",
+    "deploy": "npm run build && firebase deploy"
+  },
+  "keywords": [
+    "installment",
+    "dealer",
+    "management",
+    "mern"
+  ],
+  "author": "",
+  "license": "ISC"
+}

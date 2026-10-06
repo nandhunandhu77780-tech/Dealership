@@ -1,0 +1,21 @@
+{
+  "name": "project-karthi-workspace",
+  "version": "1.0.0",
+  "description": "Installment Dealer Management System Workspace Root",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix installment-dealer/client",
+    "client": "npm run dev --prefix installment-dealer/client",
+    "server": "npm run dev --prefix installment-dealer/server",
+    "test:payment": "node installment-dealer/server/scripts/testOnlinePayment.js",
+    "test:notifications": "node installment-dealer/server/scripts/testNotifications.js",
+    "test:profile": "node installment-dealer/server/scripts/testMemberProfile.js",
+    "test:collection": "node installment-dealer/server/scripts/testDailyCollection.js",
+    "test:member-view": "node installment-dealer/server/scripts/testMemberAccountView.js",
+    "test:activity-log": "node installment-dealer/server/scripts/testActivityLog.js",
+    "test:image-upload": "node installment-dealer/server/scripts/testProductImageUpload.js",
+    "test:admin": "node installment-dealer/server/scripts/testAdminAuthorization.js",
+    "build": "npm run build --prefix installment-dealer/client",
+    "install-all": "npm install --prefix installment-dealer/server && npm install --prefix installment-dealer/client"
+  }
+}
