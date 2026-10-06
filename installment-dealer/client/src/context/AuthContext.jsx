@@ -48,41 +48,100 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const activeUidRef = React.useRef(null);
+  const authStateRef = React.useRef({ currentUser: null, userProfile: null });
+  authStateRef.current = { currentUser, userProfile };
+
   useEffect(() => {
+    let isCurrent = true;
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!isCurrent) return;
+
       if (firebaseUser) {
-        setCurrentUser(firebaseUser);
-        const profile = await resolveProfile(firebaseUser);
-        setUserProfile(profile);
+        // If profile is already resolved for this exact user (e.g. from explicit login call), don't trigger extra re-renders
+        if (activeUidRef.current === firebaseUser.uid && authStateRef.current.userProfile) {
+          setLoading(false);
+          return;
+        }
+
+        setLoading(true);
+        try {
+          const profile = await resolveProfile(firebaseUser);
+          if (isCurrent) {
+            activeUidRef.current = firebaseUser.uid;
+            setCurrentUser(firebaseUser);
+            setUserProfile(profile);
+          }
+        } catch (err) {
+          console.error('Error resolving profile in onAuthStateChanged:', err);
+          if (isCurrent) {
+            activeUidRef.current = firebaseUser.uid;
+            setCurrentUser(firebaseUser);
+            setUserProfile({
+              name: firebaseUser.displayName || 'User',
+              email: firebaseUser.email,
+              role: 'member',
+              photoURL: firebaseUser.photoURL || '',
+              profileExists: false,
+            });
+          }
+        } finally {
+          if (isCurrent) {
+            setLoading(false);
+          }
+        }
       } else {
-        setCurrentUser(null);
-        setUserProfile(null);
+        if (isCurrent) {
+          activeUidRef.current = null;
+          setCurrentUser(null);
+          setUserProfile(null);
+          setLoading(false);
+        }
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      isCurrent = false;
+      unsubscribe();
+    };
   }, []);
 
   /**
    * Log in user with email & password and retrieve their role/profile
    */
   const login = async (email, password) => {
-    const user = await loginUser(email, password);
-    const profile = await resolveProfile(user);
-    setCurrentUser(user);
-    setUserProfile(profile);
-    return { user, profile };
+    setLoading(true);
+    try {
+      const user = await loginUser(email, password);
+      const profile = await resolveProfile(user);
+      activeUidRef.current = user.uid;
+      setCurrentUser(user);
+      setUserProfile(profile);
+      setLoading(false);
+      return { user, profile };
+    } catch (err) {
+      setLoading(false);
+      throw err;
+    }
   };
 
   /**
    * Log in user with Google popup
    */
   const loginGoogle = async () => {
-    const { user, profile } = await loginWithGoogle();
-    setCurrentUser(user);
-    setUserProfile(profile);
-    return { user, profile };
+    setLoading(true);
+    try {
+      const { user, profile } = await loginWithGoogle();
+      activeUidRef.current = user.uid;
+      setCurrentUser(user);
+      setUserProfile(profile);
+      setLoading(false);
+      return { user, profile };
+    } catch (err) {
+      setLoading(false);
+      throw err;
+    }
   };
 
   /**
@@ -90,6 +149,7 @@ export const AuthProvider = ({ children }) => {
    */
   const logout = async () => {
     await logoutUser();
+    activeUidRef.current = null;
     setCurrentUser(null);
     setUserProfile(null);
   };

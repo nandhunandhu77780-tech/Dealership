@@ -25,22 +25,21 @@ const LoginPage = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (!loading && currentUser) {
+    if (!submitting && !googleSubmitting && !loading && currentUser && role) {
       const intendedDestination = location.state?.from?.pathname;
-      const userRole = role || 'member';
       if (
         intendedDestination &&
         !intendedDestination.startsWith('/login') &&
-        (userRole === 'admin' || !intendedDestination.startsWith('/admin'))
+        (role === 'admin' || !intendedDestination.startsWith('/admin'))
       ) {
         navigate(intendedDestination + (location.state?.from?.search || ''), { replace: true });
-      } else if (userRole === 'admin') {
+      } else if (role === 'admin') {
         navigate('/admin', { replace: true });
-      } else if (userRole === 'member') {
+      } else if (role === 'member') {
         navigate('/member', { replace: true });
       }
     }
-  }, [currentUser, role, loading, navigate, location]);
+  }, [currentUser, role, loading, submitting, googleSubmitting, navigate, location]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -66,7 +65,6 @@ const LoginPage = () => {
     } catch (err) {
       console.error('Login error:', err);
       setError(formatAuthError(err));
-    } finally {
       setSubmitting(false);
     }
   };
@@ -94,7 +92,6 @@ const LoginPage = () => {
     } catch (err) {
       console.error('Google Sign-in error:', err);
       setError(formatAuthError(err));
-    } finally {
       setGoogleSubmitting(false);
     }
   };
@@ -138,6 +135,73 @@ const LoginPage = () => {
   };
 
   const isBusy = submitting || googleSubmitting;
+
+  // If already authenticated and redirecting, display a smooth branded loading card to prevent any flash of the login form
+  if (currentUser && !isBusy) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        padding: '2.5rem 1.25rem',
+        position: 'relative',
+        overflow: 'hidden',
+        backgroundColor: '#07192f',
+        backgroundImage: `
+          radial-gradient(at 0% 0%, rgba(30, 64, 175, 0.45) 0px, transparent 50%),
+          radial-gradient(at 100% 0%, rgba(234, 88, 12, 0.3) 0px, transparent 45%),
+          radial-gradient(at 50% 100%, rgba(109, 40, 217, 0.25) 0px, transparent 55%),
+          radial-gradient(at 0% 100%, rgba(14, 165, 233, 0.28) 0px, transparent 50%),
+          radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.22) 0px, transparent 45%)
+        `,
+        backgroundAttachment: 'fixed',
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: '460px',
+          backgroundColor: '#ffffff',
+          border: '1px solid rgba(226, 232, 240, 0.95)',
+          borderTop: '4px solid #ea580c',
+          borderRadius: '1.25rem',
+          padding: '3rem 2.25rem',
+          boxShadow: '0 25px 50px -12px rgba(7, 25, 47, 0.45), 0 10px 20px -5px rgba(0, 0, 0, 0.2)',
+          textAlign: 'center',
+          position: 'relative',
+          zIndex: 1,
+        }}>
+          <img
+            src="/logo.png"
+            alt="NANDANAM Agencies Logo"
+            style={{
+              height: '84px',
+              width: 'auto',
+              maxWidth: '100%',
+              objectFit: 'contain',
+              display: 'block',
+              margin: '0 auto 1.5rem',
+            }}
+          />
+          <div style={{
+            width: '42px',
+            height: '42px',
+            border: '3px solid rgba(234, 88, 12, 0.2)',
+            borderTopColor: '#ea580c',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 1.25rem',
+          }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: '900', color: '#0a2540', marginBottom: '0.4rem', letterSpacing: '-0.02em' }}>
+            Redirecting to Portal...
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0, lineHeight: 1.5 }}>
+            Session active. Loading your dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{

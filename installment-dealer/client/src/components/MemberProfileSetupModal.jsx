@@ -28,7 +28,7 @@ const MemberProfileSetupModal = () => {
   const isAdmin = userProfile?.role === 'admin';
   const hasPhone = Boolean(userProfile?.phone && String(userProfile.phone).trim().length >= 10);
   const isProfileComplete = userProfile?.profileCompleted === true;
-  const isSetupRequired = Boolean(currentUser && !isAdmin && (!hasPhone || !isProfileComplete));
+  const isSetupRequired = Boolean(currentUser && userProfile && !isAdmin && (!hasPhone || !isProfileComplete));
 
   useEffect(() => {
     if (userProfile || currentUser) {

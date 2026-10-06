@@ -27,16 +27,28 @@ const ProductRedirect = () => {
 const RootRedirect = () => {
   const { currentUser, role, loading } = useAuth();
 
-  if (loading) {
+  if (loading || (currentUser && !role)) {
     return (
       <div style={{
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
+        backgroundColor: 'var(--bg-primary)',
         color: 'var(--text-secondary)'
       }}>
-        Loading...
+        <div style={{
+          width: '42px',
+          height: '42px',
+          border: '3px solid rgba(59, 130, 246, 0.2)',
+          borderTopColor: 'var(--accent-orange, #ea580c)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+          marginBottom: '1rem'
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <p style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Loading portal...</p>
       </div>
     );
   }

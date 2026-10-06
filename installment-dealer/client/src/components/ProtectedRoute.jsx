@@ -12,7 +12,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const { currentUser, role, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  if (loading || (currentUser && !role)) {
     return (
       <div style={{
         display: 'flex',
@@ -20,19 +20,20 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
+        backgroundColor: 'var(--bg-primary)',
         color: 'var(--text-secondary)'
       }}>
         <div style={{
-          width: '40px',
-          height: '40px',
+          width: '42px',
+          height: '42px',
           border: '3px solid rgba(59, 130, 246, 0.2)',
-          borderTopColor: 'var(--accent-primary)',
+          borderTopColor: 'var(--accent-orange, #ea580c)',
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
           marginBottom: '1rem'
         }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <p>Verifying authentication...</p>
+        <p style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Verifying access permissions...</p>
       </div>
     );
   }
@@ -43,7 +44,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   // If role requirement is specified, verify role
   if (allowedRoles && allowedRoles.length > 0) {
-    if (!role || !allowedRoles.includes(role)) {
+    if (!allowedRoles.includes(role)) {
       // Redirect to user's assigned workspace if they have one
       if (role === 'admin') {
         return <Navigate to="/admin" replace />;
