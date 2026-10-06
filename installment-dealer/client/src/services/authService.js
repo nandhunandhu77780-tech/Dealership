@@ -3,9 +3,12 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithCredential,
   sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth, db } from './firebase.js';
 
 /**
@@ -20,16 +23,42 @@ export const loginUser = async (email, password) => {
 };
 
 /**
- * Sign in user using Google Pop-up
+ * Sign in user using Google
+ * - On Native Android (Capacitor): Uses native Google Identity via @capacitor-firebase/authentication
+ * - On Web: Uses standard Firebase Google pop-up
  * If the user does not have a Firestore document, creates it with role = 'member'.
  * If the user already has a Firestore document, preserves their existing role (keeps admin if admin).
  * @returns {Promise<{ user: import('firebase/auth').User, profile: { name: string, email: string, role: string, photoURL?: string } }>}
  */
 export const loginWithGoogle = async () => {
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-  const result = await signInWithPopup(auth, provider);
-  const user = result.user;
+  let user;
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const result = await FirebaseAuthentication.signInWithGoogle();
+      const idToken = result.credential?.idToken;
+      if (idToken) {
+        const credential = GoogleAuthProvider.credential(idToken);
+        const userCredential = await signInWithCredential(auth, credential);
+        user = userCredential.user;
+      } else if (result.user) {
+        user = auth.currentUser || result.user;
+      } else {
+        throw new Error('No Google credentials returned from native sign-in');
+      }
+    } catch (nativeErr) {
+      console.warn('Native Google sign-in failed, attempting browser popup fallback:', nativeErr);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await signInWithPopup(auth, provider);
+      user = result.user;
+    }
+  } else {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const result = await signInWithPopup(auth, provider);
+    user = result.user;
+  }
 
   let profileData;
   try {
@@ -75,6 +104,11 @@ export const loginWithGoogle = async () => {
  * @returns {Promise<void>}
  */
 export const logoutUser = async () => {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      await FirebaseAuthentication.signOut().catch(() => {});
+    }
+  } catch (_) {}
   await signOut(auth);
 };
 

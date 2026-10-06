@@ -14,6 +14,8 @@
     "test:profile": "node server/scripts/testMemberProfile.js",
     "test:collection": "node server/scripts/testDailyCollection.js",
     "build": "npm run build --prefix client",
+    "android:sync": "npm run build --prefix client && npx cap sync android --prefix client",
+    "android:open": "npx cap open android --prefix client",
     "deploy:rules": "firebase deploy --only firestore:rules,storage:rules",
     "deploy:hosting": "npm run build && firebase deploy --only hosting",
     "deploy": "npm run build && firebase deploy"

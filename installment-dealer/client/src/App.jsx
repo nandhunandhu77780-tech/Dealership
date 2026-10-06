@@ -12,6 +12,8 @@ import MyInstallmentsPage from './pages/MyInstallmentsPage.jsx';
 import MemberPaymentsPage from './pages/MemberPaymentsPage.jsx';
 import MemberProfilePage from './pages/MemberProfilePage.jsx';
 import PushNotificationManager from './components/PushNotificationManager.jsx';
+import AndroidBackButtonHandler from './components/AndroidBackButtonHandler.jsx';
+import NativeAppInitializer from './components/NativeAppInitializer.jsx';
 
 /**
  * Route parameter forwarder for product detail alias
@@ -72,6 +74,8 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <AndroidBackButtonHandler />
+        <NativeAppInitializer />
         <PushNotificationManager />
         <Routes>
           {/* Public Routes */}

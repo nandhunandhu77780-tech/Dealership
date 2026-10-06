@@ -1,8 +1,7 @@
 import { auth } from './firebase.js';
+import { getApiUrl } from './apiConfig.js';
 
-const rawApiUrl = import.meta.env.VITE_API_BASE_URL || '';
-const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
-const API_BASE = `${API_BASE_URL}/api/payments`;
+const API_BASE = getApiUrl('/api/payments');
 
 /**
  * Helper to get active user's Firebase Auth ID token

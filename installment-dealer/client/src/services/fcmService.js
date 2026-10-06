@@ -9,19 +9,9 @@ import {
   where,
 } from 'firebase/firestore';
 import { db, getMessagingSafe } from './firebase.js';
+import { getApiBaseUrl as getApiUrl } from './apiConfig.js';
 
 const FCM_TOKENS_COLLECTION = 'fcmTokens';
-
-/**
- * Resolve the backend notification API URL safely.
- * Uses VITE_API_BASE_URL if configured, or empty string (relative path) to leverage reverse proxy / same-domain routing.
- */
-const getApiUrl = () => {
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, '');
-  }
-  return '';
-};
 
 /**
  * Hash a string to a safe alphanumeric ID for Firestore document keys

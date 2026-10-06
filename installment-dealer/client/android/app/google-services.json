@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "403319967428",
+    "project_id": "project-karthi-b0f29",
+    "storage_bucket": "project-karthi-b0f29.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:403319967428:android:1810d2cd7a7082e8078391",
+        "android_client_info": {
+          "package_name": "com.installmentdealer.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "403319967428-bbdram4ejqtg2679r9k8gl5659tl5kp0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCdexsRMtoayQHPKgh8NGX14Pv94Zf1Ek"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "403319967428-bbdram4ejqtg2679r9k8gl5659tl5kp0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
